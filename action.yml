@@ -1,0 +1,47 @@
+name: 'Initial SSH environment'
+description: 'Initial SSH environment for later steps'
+inputs:
+  ssh-agent:
+    description: >
+      Use `ssh-agent` to store private SSH keys.
+    default: true
+  ssh-key:
+    description: >
+      Default ONE private SSH key. If `ssh-agent` input is true (default), the key will be stored in agent,
+      or it will be save to `~/.ssh/identity`.
+  ssh-known-hosts:
+    description: >
+      Known hosts in addition to the user and global host key database. The public
+      SSH keys for a host may be obtained using the utility `ssh-keyscan`. For example,
+      `ssh-keyscan github.com`.
+  ssh-strict:
+    description: >
+      Whether to perform strict host key checking. When true (default), adds the options `StrictHostKeyChecking yes`
+      and `CheckHostIP no` to `~/.ssh/config`. Use the input `ssh-known-hosts` to
+      configure additional hosts.
+    default: true
+
+runs:
+  using: "composite"
+  steps:
+    - run: mkdir ~/.ssh
+      shell: bash
+    - run: ssh-agent | grep SSH | cut -f 1 -d ';' >> "$GITHUB_ENV"
+      shell: bash
+      if: inputs.ssh-agent == 'true'
+    - run: echo 'HOST *' > ~/.ssh/config
+      shell: bash
+    - run: echo '  CheckHostIP no' >> ~/.ssh/config
+      shell: bash
+    - run: echo '  StrictHostKeyChecking yes' >> ~/.ssh/config
+      shell: bash
+      if: inputs.ssh-strict == 'true'
+    - run: echo "${{ inputs.ssh-known-hosts }}" >> ~/.ssh/known_hosts
+      shell: bash
+      if: inputs.ssh-known-hosts != ''
+    - run: ssh-add - <<< "${{ inputs.ssh-key }}"
+      shell: bash
+      if: inputs.ssh-key != '' && inputs.ssh-agent == 'true'
+    - run: echo "${{ inputs.ssh-key }}" > ~/.ssh/identity && chmod 600 ~/.ssh/identity && echo '  IdentityFile ~/.ssh/identity' >> ~/.ssh/config
+      shell: bash
+      if: inputs.ssh-key != '' && inputs.ssh-agent != 'true'
